@@ -47,7 +47,6 @@ st.markdown("""
         border: 2px solid #00BEC4 !important;
         background-color: #fbf0f8 !important;
     }
-    /* Appointment Card Styling */
     .appt-card {
         background-color: #1e1e1e;
         padding: 15px;
@@ -61,9 +60,6 @@ st.markdown("""
 
 # --- NOTIFICATION UTILITY ---
 def send_shop_alerts(pet_name, owner_name, owner_phone, service, date_str, chosen_slot):
-    """
-    Handles background alerts for new bookings to email and SMS.
-    """
     shop_email = "freshprintsgrooming@gmail.com"
     shop_phone = "574 780 9499"
     
@@ -80,7 +76,6 @@ def send_shop_alerts(pet_name, owner_name, owner_phone, service, date_str, chose
     
     print(f"\n=== NOTIFICATION SENT TO {shop_email} & {shop_phone} ===\n{alert_body}\n========================")
     
-    # Email Delivery
     if "smtp_user" in st.secrets and "smtp_password" in st.secrets:
         try:
             msg = MIMEMultipart()
@@ -96,7 +91,6 @@ def send_shop_alerts(pet_name, owner_name, owner_phone, service, date_str, chose
         except Exception as e:
             print(f"SMTP Email Error: {e}")
 
-    # SMS Delivery via Twilio
     if "twilio_sid" in st.secrets:
         try:
             from twilio.rest import Client
@@ -122,75 +116,14 @@ if "admin_operating_slots" not in st.session_state:
 if "success_message" not in st.session_state:
     st.session_state.success_message = None
 
-# Crash prevention: Safely initialize and migrate old session data
 if "booked_slots" not in st.session_state:
     st.session_state.booked_slots = {}
 else:
-    for d_key, bookings_list in st.session_state.booked_slots.items():
-        if len(bookings_list) > 0 and isinstance(bookings_list[0], str):
-            # Convert old string-only data into the new dictionary format to prevent crashes
-            st.session_state.booked_slots[d_key] = [
-                {"slot": time_str, "pet_name": "Unknown", "owner_name": "Unknown", "phone": "N/A", "service": "Legacy Booking"} 
-                for time_str in bookings_list
-            ]
-
-
-# --- POP-UP MODAL FUNCTION ---
-@st.dialog("Book Your Appointment")
-def appointment_modal(selected_date):
-    date_str = selected_date.strftime("%Y-%m-%d")
-    
-    allowed_by_admin = st.session_state.admin_operating_slots.get(date_str, ALL_POSSIBLE_SLOTS)
-    already_booked_data = st.session_state.booked_slots.get(date_str, [])
-    
-    # Extract just the time slots from the saved dictionaries
-    booked_time_strings = [booking["slot"] for booking in already_booked_data]
-    available_slots = [slot for slot in allowed_by_admin if slot not in booked_time_strings]
-    
-    st.markdown(f"### 📅 {selected_date.strftime('%A, %b %d, %Y')}")
-    
-    if not allowed_by_admin:
-        st.warning("⚠️ The shop manager hasn't opened any schedule availability for this date.")
-        return
-    elif not available_slots:
-        st.error("❌ Fully Booked! All managed times for this day have been filled.")
-        return
-
-    with st.form("booking_form", clear_on_submit=True):
-        pet_name = st.text_input("🐶 Dog's Name", placeholder="e.g., Carlton")
-        owner_name = st.text_input("👤 Your First & Last Name")
-        owner_phone = st.text_input("📱 Cell Phone Number", placeholder="e.g., 574-555-1234")
-        
-        service = st.selectbox(
-            "✂️ Choose Service Style", 
-            ["The Fresh Cut (Full Grooming)", "The Bel-Air Bath (Bath & Brush)", "Quick Paw Polish & Nails"]
-        )
-        
-        chosen_slot = st.selectbox("⏰ Select From Open Times", available_slots)
-        submit = st.form_submit_button("Confirm Fresh Booking", use_container_width=True)
-        
-        if submit:
-            if not pet_name or not owner_name or not owner_phone:
-                st.error("Hold up! We need your name, cell phone, and pup's name to finalize your reservation.")
-            else:
-                if date_str not in st.session_state.booked_slots:
-                    st.session_state.booked_slots[date_str] = []
-                
-                # Append structural data payload containing all parameters
-                st.session_state.booked_slots[date_str].append({
-                    "slot": chosen_slot,
-                    "pet_name": pet_name,
-                    "owner_name": owner_name,
-                    "phone": owner_phone,
-                    "service": service
-                })
-                
-                send_shop_alerts(pet_name, owner_name, owner_phone, service, date_str, chosen_slot)
-                
-                st.session_state.success_message = (
-                    f"✨ **Lookin' Fresh!** Booking confirmed for {pet_name} on {date_str} at {chosen_slot}."
-                )
-                st.rerun()
+    # Bulletproof catch: Erase legacy string-only data to prevent dictionary key crashes
+    for d_key in list(st.session_state.booked_slots.keys()):
+        if len(st.session_state.booked_slots[d_key]) > 0:
+            if isinstance(st.session_state.booked_slots[d_key][0], str):
+                st.session_state.booked_slots[d_key] = []
 
 
 # --- APP INTERFACE BREAKDOWN (TABS) ---
@@ -200,3 +133,106 @@ tab_client, tab_admin = st.tabs(["✨ Book a Spa Day", "🔐 Salon Admin Setting
 # 1. CLIENT LANDING PAGE VIEW
 # ==========================================
 with tab_client:
+    st.markdown('<h1 class="fresh-title">🐾 FRESH PRINTS GROOMING 🐾</h1>', unsafe_allow_html=True)
+    st.image("https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=800", use_container_width=True)
+    
+    st.markdown("---")
+    
+    if st.session_state.success_message:
+        st.success(st.session_state.success_message)
+        st.session_state.success_message = None 
+        
+    st.subheader("Our Fresh Packages")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("### 🧼 Bel-Air Bath")
+        st.write("Premium hydro-massage bath, blow dry, complete blowout brush, and standard scent spray.")
+    with col2:
+        st.markdown("### ✂️ The Fresh Cut")
+        st.write("Everything in the luxury bath tier combined with a custom top-tier breed haircut.")
+    with col3:
+        st.markdown("### 💅 Flashy Paws")
+        st.write("Expedited care adjustments for nail grinding, detailing trim, and deep ear sanitizing.")
+
+    st.markdown("---")
+    st.subheader("Book Your Spot")
+    
+    col_calendar, col_action = st.columns([1, 1.2])
+    with col_calendar:
+        st.write("**1. Pick a date:**")
+        tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+        client_target_date = st.date_input("Select Target Date", value=tomorrow, min_value=tomorrow, key="client_date", label_visibility="collapsed")
+        date_str = client_target_date.strftime("%Y-%m-%d")
+        
+    with col_action:
+        st.write("**2. Secure your appointment:**")
+        
+        allowed_by_admin = st.session_state.admin_operating_slots.get(date_str, ALL_POSSIBLE_SLOTS)
+        already_booked_data = st.session_state.booked_slots.get(date_str, [])
+        booked_time_strings = [booking["slot"] for booking in already_booked_data]
+        available_slots = [slot for slot in allowed_by_admin if slot not in booked_time_strings]
+        
+        if not allowed_by_admin:
+            st.warning("⚠️ The shop manager hasn't opened availability for this date.")
+        elif not available_slots:
+            st.error("❌ Fully Booked! All managed times for this day have been filled.")
+        else:
+            with st.form("booking_form", clear_on_submit=False):
+                pet_name = st.text_input("🐶 Dog's Name", placeholder="e.g., Carlton")
+                owner_name = st.text_input("👤 Your First & Last Name")
+                owner_phone = st.text_input("📱 Cell Phone Number", placeholder="e.g., 574-555-1234")
+                
+                service = st.selectbox(
+                    "✂️ Choose Service Style", 
+                    ["The Fresh Cut (Full Grooming)", "The Bel-Air Bath (Bath & Brush)", "Quick Paw Polish & Nails"]
+                )
+                
+                chosen_slot = st.selectbox("⏰ Select From Open Times", available_slots)
+                submit = st.form_submit_button("Confirm Fresh Booking", use_container_width=True)
+                
+                if submit:
+                    if not pet_name or not owner_name or not owner_phone:
+                        st.error("Hold up! We need your name, cell phone, and pup's name to finalize your reservation.")
+                    else:
+                        if date_str not in st.session_state.booked_slots:
+                            st.session_state.booked_slots[date_str] = []
+                        
+                        st.session_state.booked_slots[date_str].append({
+                            "slot": chosen_slot,
+                            "pet_name": pet_name,
+                            "owner_name": owner_name,
+                            "phone": owner_phone,
+                            "service": service
+                        })
+                        
+                        send_shop_alerts(pet_name, owner_name, owner_phone, service, date_str, chosen_slot)
+                        st.session_state.success_message = f"✨ **Lookin' Fresh!** Booking confirmed for {pet_name} on {date_str} at {chosen_slot}."
+                        st.rerun()
+
+
+# ==========================================
+# 2. ADMINISTRATOR PORTAL VIEW
+# ==========================================
+with tab_admin:
+    st.subheader("⚙️ Fresh Prints Control Panel")
+    st.write("Configure daily schedule parameters and view incoming client bookings.")
+    
+    admin_password = st.text_input("Enter Admin Security Token", type="password")
+    
+    if admin_password == "freshprints":
+        st.info("🔓 Access Granted.")
+        st.markdown("---")
+        
+        admin_col_left, admin_col_right = st.columns([1.2, 2])
+        
+        with admin_col_left:
+            st.write("#### 📅 Adjust Available Hours")
+            tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+            admin_date = st.date_input("Choose Date to Modify", value=tomorrow, key="admin_date")
+            admin_date_str = admin_date.strftime("%Y-%m-%d")
+            
+            raw_configured_hours = st.session_state.admin_operating_slots.get(admin_date_str, ALL_POSSIBLE_SLOTS)
+            # Failsafe: Ensure defaults strictly match ALL_POSSIBLE_SLOTS to prevent multiselect crashes
+            safe_defaults = [h for h in raw_configured_hours if h in ALL_POSSIBLE_SLOTS]
+            
+            st.write(f"Active
